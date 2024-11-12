@@ -1,0 +1,949 @@
+---
+title: "BuenoMattera-CS544-Term-Project"
+author: "Franco Bueno Mattera"
+date: "11/24/2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+## Project Description:
+
+The main objective of this project is to analyze a dataset that contains 
+information about different data analysts positions around the United States.
+There are 3 main questions that this project intends to answer:
+
+1.	As of July 2020, what is the general distribution of the variable Salary for 
+data analysts’ jobs?
+
+2.	As of July 2020, what is the most common type of company that offers data analyst positions
+across the United States?
+
+3. As of July 2020, what is the variability and distribution of salaries between the cities of 
+New, York, Chicago, Los Angeles, Charlotte (NC), San Francisco and Austin (TX)?
+
+
+## 1. Data Preparation and Preprocessing:
+
+```{r}
+#### Opening the Dataset:
+
+df <- read.csv('DataAnalyst.csv')
+summary(df)
+sprintf("This dataset, in its original form contains %d rows and %d columns", 
+        nrow(df), ncol(df))
+```
+
+## 1.1 Cleaning the dataset in order to address the questions from project:
+
+
+```{r}
+# Deleting some unnecessary columns:
+df <- df[,-c(14, 15)]
+
+# deleting rows labels ad -1 (those are missing values that are labeled like 
+# that in order to work with ML problems)
+
+df[df == -1] <- NA
+df <- na.omit(df)
+
+```
+
+
+## 1.2 Preparing the dataset to answer questions of interest: 
+
+```{r}
+# Selecting main columns:
+df <- df[,c(3,6, 10)]
+summary(df)
+sprintf("This dataset now clean of NAs contains %d rows and %d columns", 
+        nrow(df), ncol(df))
+```
+
+### 1.2.1  Creating two numeric columns that contain minimum and maximum 
+salary estimates:
+
+```{r}
+library(readr)
+library(tidyr)
+
+#split columns by '-'
+
+df <- separate(df, Salary.Estimate, c('min.salary', 'max.salary'), sep = '-')
+df$min.salary <- as.numeric(parse_number(as.character(df$min.salary)))
+df$max.salary <- as.numeric(parse_number(as.character(df$max.salary)))
+
+# Source: https://stackoverflow.com/questions/14543627/extracting-numbers-from-vectors-of-strings
+# https://tidyr.tidyverse.org/reference/separate.html
+unique(df$min.salary)
+unique(df$max.salary)
+summary(df)
+
+# Changing the variable types
+df$Location <- as.factor(df$Location)
+df$Type.of.ownership <- as.factor(df$Type.of.ownership)
+df$min.salary <- as.numeric(df$min.salary)
+df$max.salary <- as.numeric(df$max.salary)
+
+```
+
+### 1.2.2 Selecting important factors in categorical variables of interest
+
+```{r}
+# filtering by cities of interest:
+
+df <-subset(df, Location == 'New York, NY' | Location == 'Los Angeles, CA'|
+       Location == 'San Francisco, CA' | Location == 'Austin, TX'| 
+       Location == 'Charlotte, NC'| Location == 'Chicago, IL')
+df <- droplevels(df) 
+# source: https://www.reddit.com/r/rstats/comments/38krab/why_does_r_retain_factor_values_that_i_remove/
+
+# filtering by  Type of ownership
+
+
+df <-subset(df,  Type.of.ownership == 'Company - Private' |
+          Type.of.ownership == 'Company - Public'|
+          Type.of.ownership == 'Nonprofit Organization' |  
+          Type.of.ownership == 'Subsidiary or Business Segment'| 
+          Type.of.ownership == 'Hospital'| 
+          Type.of.ownership == 'College / University')
+
+df <- droplevels(df)
+
+
+sprintf("The final dataset to work with contains %d rows and %d columns",
+        nrow(df), ncol(df))
+
+```
+
+
+## 2. Data Analysis
+
+### 2.1 Exploratory data analysis of variables of interest: 
+
+### 2.1.1 Analizing the variables Min and Max Salaries:
+
+```{r}
+# Summary:
+
+print('Max salary summary (thousands of US Dollars):')
+
+summary(df$max.salary)
+sprintf('Standard Deviation of maximum salary: %g',sd(df$max.salary))
+
+print('Min salary summary (thousands of US Dollars):')
+
+sprintf('Standard Deviation of minimum salary: %g',sd(df$min.salary))
+
+summary(df$min.salary)
+
+#distribution of variables and identifying  outliers:
+
+par(mfrow = c(1,2))
+
+hist(df$max.salary, 
+     main = 'Distribution of Maximum Salary for data analyst jobs\naround the United States',
+    cex.main = 0.6, xlab = 'Salary(in thousands of US Dollars )', col = 'wheat3')
+hist(df$min.salary, main = 'Distribution of Minimum Salary for data analyst jobs\naround the United States',
+    cex.main = 0.6, xlab = 'Salary(in thousands of US Dollars )', col = 'wheat3')
+boxplot(df$max.salary, main = 'Boxplot of maximum Salary for data analyst jobs\naround the United States',
+       cex.main = 0.6, ylab = 'Salary(in thousands of US Dollars )', col = 'wheat3')
+boxplot(df$min.salary, main = 'Boxplot of minimum Salary for data analyst jobs\naround the United States',
+       cex.main = 0.6, ylab = 'Salary(in thousands of US Dollars )',  col = 'wheat3')
+
+par(mfrow = c(1,1))
+
+# Shapiro Wilk test of normality
+# Ho means that that population is not normally distribute(R-Coockbook. J.D Long & Paul Teetor 249p)
+
+print("Max Salary: ")
+
+shapiro.test(df$max.salary)
+
+print("Mim Salary: ")
+
+shapiro.test(df$min.salary)
+
+```
+
+
+
+### 2.1.2 Analyzing the categorical variable Type.of.ownership:
+
+```{r}
+table(df$Type.of.ownership)
+
+library(ggplot2)
+
+ggplot(df, aes(Type.of.ownership, fill = Type.of.ownership))+
+geom_bar()+
+ylab('Frequency')+
+xlab('Company Type')+
+ggtitle('')+
+scale_x_discrete(labels = element_blank())+
+scale_fill_viridis_d()+
+guides(fill= guide_legend(title = NULL))
+
+table(df$Type.of.ownership)/length(df$Type.of.ownership)
+
+# Consulted: R-Graphics cookbook Winston Chang 194,254p
+#            R-Documentation, ggplot2
+#            https://stackoverflow.com/questions/35090883/remove-all-of-x-axis-labels-in-ggplot
+#            https://stackoverflow.com/questions/35090883/remove-all-of-x-axis-labels-in-ggplot
+```
+
+## 2.2 Demonstrating the applicability of the Central Limit Theorem
+
+The Central Limit Theorem states that if many samples of large enough sizes are drawn from a population with any type of distribution, its sampling distribution of the sample means will be approximately normally distributed with mu.xbar = mu and a standard deviation of sigma/sqrt(sample size).(Statistics James Mclave & Terry Sincich 285p).
+
+In order for this theory to be applied, the samples drawn from the population need to be representative, meaning that every unit in the population needs to have the same chance of being selected (Statistics James Mclave & Terry Sincich 285p).
+
+To comply with this, the population of this study is assumed to be the population of interest. From it, multiple samples will be drawn and the questions that were proposed at the beginning will attempt to be solved, and the estimators compared with the population parameters.
+
+Many sampling methods will be used to draw multiple samples and build different sampling distributions of sample means. After that, the sampling method that yields the best results will be used to perform single sampling parametric and non parametric tests to answer the same questions.
+
+
+### 2.2.1 What is the variability of salaries between the cities of New, York, Boston, Los Angeles, Charlotte (NC), San Francisco and Austin (TX)?
+
+
+### 2.2.1.1 Using population parameters
+
+```{r}
+# Caculating population parameters:
+
+mean.func <- function(numeric.col.number, dataframe = df, categorical.col, category){
+    m <- subset(dataframe, categorical.col == category)
+    m <- m[[numeric.col.number]]
+    m = mean(m)
+    return(m)
+}
+print('Minimum Salary:')
+
+print('New York: ')
+round(mean.func(1, df, df$Location, "New York, NY"), digits = 3)
+print('Los Angeles: ')
+round(mean.func(1, df, df$Location, "Los Angeles, CA"), digits = 3)
+print('San Francisco: ')
+round(mean.func(1, df, df$Location, "San Francisco, CA"), digits = 3)
+print('Austin: ')
+round(mean.func(1, df, df$Location, "Austin, TX"), digits = 3)
+print('Charlotte: ')
+round(mean.func(1, df, df$Location, "Charlotte, NC"), digits = 3)
+print('Chicago: ')
+round(mean.func(1, df, df$Location, "Chicago, IL"), digits = 3)
+
+print('Maximum Salary:')
+
+print('New York: ')
+round(mean.func(2, df, df$Location, "New York, NY"), digits = 3)
+print('Los Angeles: ')
+round(mean.func(2, df, df$Location, "Los Angeles, CA"), digits = 3)
+print('San Francisco: ')
+round(mean.func(2, df, df$Location, "San Francisco, CA"), digits = 3)
+print('Austin: ')
+round(mean.func(2, df, df$Location, "Austin, TX"), digits = 3)
+print('Charlotte: ')
+round(mean.func(2, df, df$Location, "Charlotte, NC"), digits = 3)
+print('Chicago: ')
+round(mean.func(2, df, df$Location, "Chicago, IL"), digits = 3)
+
+# boxplot
+
+box.chart <- function(dataframe, numeric.col, categorical.col, x, y, main, Fill){
+    ggplot(dataframe, aes(y = numeric.col, x = categorical.col, fill = Fill))+
+    geom_boxplot(notch = T)+
+    scale_x_discrete(labels = element_blank())+
+    scale_fill_viridis_d()+
+    xlab(x)+
+    ylab(y)+
+    ggtitle(main)+
+    theme(plot.title = element_text(hjust = 0.5, size = 13))+
+    guides(fill= guide_legend(title = NULL))
+}
+
+# Consulted: R-Graphics cookbook Winston Chang 145,194,254,250p
+#            R-Documentation, ggplot2 Theme elements
+#            https://stackoverflow.com/questions/35090883/remove-all-of-x-axis-labels-in-ggplot
+# 
+
+box.chart(df, df$min.salary, df$Location, 'City', 'Minimum Salary', '', df$Location)
+box.chart(df, df$max.salary, df$Location, 'City', 'Maximum Salary', '', df$Location)
+
+
+
+
+# distribution by factor:
+
+
+NY <- subset(df, Location == "New York, NY")
+
+
+AU <- subset(df, Location == "Austin, TX")
+
+
+CHAR <- subset(df, Location == "Charlotte, NC")
+
+
+SF <- subset(df, Location == "San Francisco, CA")
+
+
+LA <- subset(df, Location == "Los Angeles, CA")
+
+
+CHI <- subset(df, Location == "Chicago, IL")
+
+
+distrib <- function(dataframe, numeric.col.number, x, y, main){
+    hist(dataframe[[1]], xlab = x, ylab = y, main = main, col = 'wheat3', cex.main = 0.8)
+}
+
+par(mfrow = c(2,3))
+
+distrib(NY, 1, 'Minimum Salary (in thousands of US Dollars)', 'Frequency', 'Distribution of Minimum Salary in New York')
+distrib(AU, 1, 'Minimum Salary (in thousands of US Dollars)', 'Frequency', 'Distribution of Minimum Salary in Austin')
+distrib(CHAR, 1, 'Minimum Salary (in thousands of US Dollars)', 'Frequency', 'Distribution of Minimum Salary in Charlotte')
+distrib(SF, 1, 'Minimum Salary (in thousands of US Dollars)', 'Frequency', 'Distribution of Minimum Salary in San Francisco')
+distrib(LA, 1, 'Minimum Salary (in thousands of US Dollars)', 'Frequency', 'Distribution of Minimum Salary in Los Angeles')
+distrib(CHI, 1, 'Minimum Salary (in thousands of US Dollars)', 'Frequency', 'Distribution of Minimum Salary in Chicago')
+par(mfrow = c(1,1))
+
+par(mfrow = c(2,3))
+
+distrib(NY, 2, 'Maximum Salary (in thousands of US Dollars)', 'Frequency', 'Distribution of Maximum Salary in New York')
+distrib(AU, 2, 'Maximum Salary (in thousands of US Dollars)', 'Frequency', 'Distribution of Maximum Salary in Austin')
+distrib(CHAR, 2, 'Maximum Salary (in thousands of US Dollars)', 'Frequency', 'Distribution of Maximum Salary in Charlotte')
+distrib(SF, 2, 'Maximum Salary (in thousands of US Dollars)', 'Frequency', 'Distribution of Maximum Salary in San Francisco')
+distrib(LA, 2, 'Maximum Salary (in thousands of US Dollars)', 'Frequency', 'Distribution of Maximum Salary in Los Angeles')
+distrib(CHI, 2, 'Maximum Salary (in thousands of US Dollars)', 'Frequency', 'Distribution of Maximum Salary in Chicago')
+par(mfrow = c(1,1))
+
+# Shapiro Wilk test of normality
+# Ho means that that population is not normally distribute(R-Coockbook. J.D Long & Paul Teetor 249p)
+
+print("Company Minimum Salary: ")
+
+shapiro.test(NY[[1]])
+shapiro.test(LA[[1]])
+shapiro.test(SF[[1]])
+shapiro.test(AU[[1]])
+shapiro.test(CHAR[[1]])
+shapiro.test(CHI[[1]])
+
+# Shapiro Wilk test of normality
+# Ho means that that population is not normally distribute(R-Coockbook. J.D Long & Paul Teetor 249p)
+
+print("Company Maximum Salary: ")
+
+shapiro.test(NY[[2]])
+shapiro.test(LA[[2]])
+shapiro.test(SF[[2]])
+shapiro.test(AU[[2]])
+shapiro.test(CHAR[[2]])
+shapiro.test(CHI[[2]])
+
+```
+
+### 2.2.1.2 Using Central Limit Theorem
+
+```{r}
+set.seed(900)
+
+# function that returns the means of 1000 samples of size 100
+
+simple <- function(nsamples, df, size, numeric.variable.number){
+    xbar = numeric(nsamples)
+    for (i in 1:nsamples){
+        xbar[i]  = mean(sample(df[[numeric.variable.number]], size = size, replace = T))
+    
+    }
+return(xbar)
+}
+
+# consulted: Lecture 8 samples, MET CS544
+print('Min Salary :')
+
+
+print('New York: ')
+
+sprintf('The average minimum salary for the population and sampling mean is %g and %g respectively',
+        mean(NY$min.salary),mean(simple(1000, NY, 100, 1)) )
+
+print('Los Angeles: ')
+
+sprintf('The average minimum salary for the population and sampling mean is %g and %g respectively',
+        mean(LA$min.salary),mean(simple(1000, LA, 100, 1)) )
+
+print('San Francisco: ')
+
+sprintf('The average minimum salary for the population and sampling mean is %g and %g respectively',
+        mean(SF$min.salary),mean(simple(1000, SF, 100, 1)) )
+
+print('Austin: ')
+
+sprintf('The average minimum salary for the population and sampling mean is %g and %g respectively',
+        mean(AU$min.salary),mean(simple(1000, AU, 100, 1)) )
+
+print('Charlotte: ')
+
+sprintf('The average minimum salary for the population and sampling mean is %g and %g respectively',
+        mean(CHAR$min.salary),mean(simple(1000, CHAR, 100, 1)) )
+
+print('Chicago: ')
+
+sprintf('The average minimum salary for the population and sampling mean is %g and %g respectively',
+        mean(CHI$min.salary),mean(simple(1000, CHI, 100, 1)) )
+print('Max Salary :')
+
+
+
+print('New York: ')
+
+sprintf('The average maximum salary for the population and sampling mean is %g and %g respectively',
+        mean(NY$max.salary),mean(simple(1000, NY, 100, 2)) )
+
+print('Los Angeles: ')
+
+sprintf('The average maximum salary for the population and sampling mean is %g and %g respectively',
+        mean(LA$max.salary),mean(simple(1000, LA, 100, 2)) )
+
+print('San Francisco: ')
+
+sprintf('The average maximum salary for the population and sampling mean is %g and %g respectively',
+        mean(SF$max.salary),mean(simple(1000, SF, 100, 2)) )
+
+print('Austin: ')
+
+sprintf('The average maximum salary for the population and sampling mean is %g and %g respectively',
+        mean(AU$max.salary),mean(simple(1000, AU, 100, 2)) )
+
+print('Charlotte: ')
+
+sprintf('The average maximum salary for the population and sampling mean is %g and %g respectively',
+        mean(CHAR$max.salary),mean(simple(1000, CHAR, 100, 2)) )
+
+print('Chicago: ')
+
+sprintf('The average maximum salary for the population and sampling mean is %g and %g respectively',
+        mean(CHI$max.salary),mean(simple(1000, CHI, 100, 2)) )
+
+# barplot function. Plotting confidence intervals
+
+bar.chart <- function(dataframe, numeric.col1, numeric.col2, categorical.col, x, y, main){
+    ggplot(dataframe , aes(x = categorical.col, y = numeric.col1, fill = categorical.col))+
+    geom_bar(stat = 'identity')+
+    geom_errorbar(aes(ymin = numeric.col1 - numeric.col2, 
+               ymax = numeric.col1 + numeric.col2), width=.1,
+                 position=position_dodge(.9))+
+    scale_fill_viridis_d()+
+    xlab(x)+
+    ylab(y)+
+    ggtitle(main)+
+    theme(plot.title = element_text(hjust = 0.5, size = 13))+
+    guides(fill= guide_legend(title = NULL))
+        
+
+}
+
+
+# Consulted: R-Graphics cookbook Winston Chang 194,250, 254p
+#            R-Documentation, ggplot2 Theme elements
+
+# http://environmentalcomputing.net/plotting-with-ggplot-bar-plots-with-error-bars/
+
+# Looking at the differences with confidence intervals: Minimum Salary
+
+min.bars <- rbind( cbind(Name = rep('Ney York', times = 1000 ), min.salary = simple(1000, NY, 100, 1), margin = qnorm(0.025, lower.tail = F)*sd(simple(1000, NY, 100, 1))),
+                   cbind(Name = rep('Los Angeles', times = 1000 ), min.salary = simple(1000, LA, 100, 1), margin = qnorm(0.025, lower.tail = F)*sd(simple(1000, LA, 100, 1))),
+                   cbind(Name = rep('San Francisco', times = 1000 ), min.salary = simple(1000, SF, 100, 1), margin = qnorm(0.025, lower.tail = F)*sd(simple(1000, SF, 100, 1))),
+                   cbind(Name = rep('Austin', times = 1000 ), min.salary = simple(1000, AU, 100, 1), margin = qnorm(0.025, lower.tail = F)*sd(simple(1000, AU, 100, 1))),
+                   cbind(Name = rep('Charlotte', times = 1000 ), min.salary = simple(1000, CHAR, 100, 1), margin = qnorm(0.025, lower.tail = F)*sd(simple(1000, CHAR, 100, 1))),
+                   cbind(Name = rep('Chicago', times = 1000 ), min.salary = simple(1000, CHI, 100, 1), margin = qnorm(0.025, lower.tail = F)*sd(simple(1000, CHI, 100, 1))))
+
+
+library(dplyr)
+min.bars <- as.data.frame(min.bars) # transforming into data frame
+min.bars$min.salary <- as.numeric(as.character(min.bars$min.salary))  # transforming numeric column to integer
+min.bars$margin <- as.numeric(as.character(min.bars$margin))
+
+min.bars.summary <- min.bars %>% group_by(Name) %>% summarise(mean = mean(min.salary), margin = mean(margin))
+
+min.bars.summary
+
+# consulted: # https://stackoverflow.com/questions/26391921/how-to-convert-entire-dataframe-to-numeric-while-preserving-decimals
+bar.chart(min.bars.summary, min.bars.summary$mean,
+          min.bars.summary$margin, min.bars.summary$Name, "Location", 'Minimum Salary', 'Confidence intervals for minimum salary in thousands of US Dollars(CLT)' )
+
+
+
+
+
+# Looking at the differences with confidence intervals: Maximum Salary
+
+max.bars <- rbind( cbind(Name = rep('New York', times = 1000 ), max.salary = simple(1000, NY, 100, 2), margin = qnorm(0.025, lower.tail = F)*sd(simple(1000, NY, 100, 2))),
+                   cbind(Name = rep('Los Angeles', times = 1000 ), max.salary = simple(1000, LA, 100, 2), margin = qnorm(0.025, lower.tail = F)*sd(simple(1000, LA, 100, 2))),
+                   cbind(Name = rep('San Francisco', times = 1000 ), max.salary = simple(1000, SF, 100, 2), margin = qnorm(0.025, lower.tail = F)*sd(simple(1000, SF, 100, 2))),
+                   cbind(Name = rep('Austin', times = 1000 ), max.salary = simple(1000, AU, 100, 2), margin = qnorm(0.025, lower.tail = F)*sd(simple(1000, AU, 100, 2))),
+                   cbind(Name = rep('Charlotte', times = 1000 ), max.salary = simple(1000, CHAR, 100, 2), margin = qnorm(0.025, lower.tail = F)*sd(simple(1000, CHAR, 100, 2))),
+                   cbind(Name = rep('Chicago', times = 1000 ), max.salary = simple(1000, CHI, 100, 2), margin = qnorm(0.025, lower.tail = F)*sd(simple(1000, CHI, 100, 2))))
+
+
+
+max.bars <- as.data.frame(max.bars) # transforming into data frame
+max.bars$max.salary <- as.numeric(as.character(max.bars$max.salary))  # transforming numeric column to integer
+max.bars$margin <- as.numeric(as.character(max.bars$margin))
+
+max.bars.summary <- max.bars %>% group_by(Name) %>% summarise(mean = mean(max.salary), margin = mean(margin))
+
+# consulted: # https://stackoverflow.com/questions/26391921/how-to-convert-entire-dataframe-to-numeric-while-preserving-decimals
+
+max.bars.summary
+
+bar.chart(max.bars.summary, max.bars.summary$mean,
+          max.bars.summary$margin, max.bars.summary$Name, "Location", 'Maximum Salary', 'Confidence intervals for maximum salary in thousands of US Dollars(CLT)' )
+
+# Checking the new distributions:
+
+
+distrib.cl <- function(mean, x, y, main){
+    hist(mean, xlab = x, ylab = y, main = main, col = 'wheat3', cex.main = 0.8, cex.lab = 0.9)
+}
+
+par(mfrow = c(2,3))
+
+distrib.cl(simple(1000, NY, 100, 1),
+           'Minimum Salary (in thousands of US Dollars)', 'Frequency', 
+           'Distribution of Minimum Salary in New York\nafter 1000 samples using simple random sampling' )
+
+distrib.cl(simple(1000, LA, 100, 1),
+           'Minimum Salary (in thousands of US Dollars)', 'Frequency', 
+           'Distribution of Minimum Salary in Los Angeles\nafter 1000 samples using simple random sampling' )
+
+
+distrib.cl(simple(1000, SF, 100, 1),
+           'Minimum Salary (in thousands of US Dollars)', 'Frequency', 
+           'Distribution of Minimum Salary in San Francisco\nafter 1000 samples using simple random sampling' )
+
+distrib.cl(simple(1000, AU, 100, 1),
+           'Minimum Salary (in thousands of US Dollars)', 'Frequency', 
+           'Distribution of Minimum Salary in Austin\nafter 1000 samples using simple random sampling' )
+
+distrib.cl(simple(1000, CHAR, 100, 1),
+           'Minimum Salary (in thousands of US Dollars)', 'Frequency', 
+           'Distribution of Minimum Salary in Charlotte\nafter 1000 samples using simple random sampling' )
+
+distrib.cl(simple(1000, CHI, 100, 1),
+           'Minimum Salary (in thousands of US Dollars)', 'Frequency', 
+           'Distribution of Minimum Salary in Chicago\nafter 1000 samples using simple random sampling' )
+
+par(mfrow = c(1,1))
+
+par(mfrow = c(2,3))
+
+distrib.cl(simple(1000, NY, 100, 2),
+           'Maximum Salary (in thousands of US Dollars)', 'Frequency', 
+           'Distribution of Maximum  Salary in New York\nafter 1000 samples using simple random sampling' )
+
+distrib.cl(simple(1000, LA, 100, 2),
+           'Maximum  Salary (in thousands of US Dollars)', 'Frequency', 
+           'Distribution of Maximum  Salary in Los Angeles\nafter 1000 samples using simple random sampling' )
+
+
+distrib.cl(simple(1000, SF, 100, 2),
+           'Maximum  Salary (in thousands of US Dollars)', 'Frequency', 
+           'Distribution of Maximum  Salary in San Francisco\nafter 1000 samples using simple random sampling' )
+
+distrib.cl(simple(1000, AU, 100, 2),
+           'Maximum  Salary (in thousands of US Dollars)', 'Frequency', 
+           'Distribution of Maximum  Salary in Austin\nafter 1000 samples using simple random sampling' )
+
+distrib.cl(simple(1000, CHAR, 100, 2),
+           'Maximum  Salary (in thousands of US Dollars)', 'Frequency', 
+           'Distribution of Maximum  Salary in Charlotte\nafter 1000 samples using simple random sampling' )
+
+distrib.cl(simple(1000, CHI, 100, 2),
+           'Maximum  Salary (in thousands of US Dollars)', 'Frequency', 
+           'Distribution of Maximum  Salary in Chicago\nafter 1000 samples using simple random sampling' )
+
+par(mfrow = c(1,1))
+
+```
+
+The sampling distribution of the sample mean of salaries is almost identical to the population parameter salary per different cities. 
+
+### 2.2.1.3 Using Parametric and Non-Parametric tests
+
+Here, a parametric method and also a non-marametric method will be used to estimate the population parameter mean salary for data analyst jobs per city. Those will be compared with the population parameter and the sampling distribution of the sample mean. Also, this is a good oportunity to experiment how resistant to severe departures of normality the parametric methods are, and depending on how big the sample size is(100 or 300), how it compares with the non parametric method. 
+
+#### Simple Random sampling
+
+```{r}
+#install.packages("sampling")
+set.seed(200)
+library(sampling)
+
+s <- function(df, n){
+    x = srswor(n, nrow(df))
+    r = (1:nrow(df))[x==1]
+    s = df[r,]
+    return(s)
+    
+}
+
+
+Simple100 <- s(df, 100)
+Simple28 <-  s(df, 28)
+
+
+# Consulted: R - Documentation Random Samples and Permutations, 
+#            Simple random sampling without replacement
+#            Lecture6_rsamples, lecture8_Rsamples
+summary(Simple28)
+
+```
+
+#### Systematic Sampling
+
+```{r}
+set.seed(201)
+sys <- function(df, n){
+    k = ceiling(nrow(df)/n)
+    r = sample(k, 1)
+    s =  seq(from = r, by = k, length = n)
+    s <- df[s,]
+    return(s)
+}
+
+Sys100 <- sys(df, 100)
+Sys100 <- na.omit(Sys100)# remove NANs at the tail
+
+# Consulted: R- Documentation Random Samples and Permutations, 
+#            Simple random sampling without replacement
+#            Lecture6_rsamples, lecture8_Rsamples
+#            CS544 Study Guide Module 5 Sampling and Errors
+```
+
+#### Systematic Sampling with equal probabilities for variable Location (# Location has to be a factor)
+
+```{r}
+set.seed(202)
+sysp <- function(df,col, n){
+    category.number = 
+    prob = inclusionprobabilities(as.numeric(col), n)
+    sys = UPsystematic(prob)
+    s = df[sys == 1,]
+    return(s)
+}
+Sysp100 <- sysp(df, df$Location, 100)
+# Consulted: R- Documentation Random Samples and Permutations, 
+#            Simple random sampling without replacement
+#            Lecture6_rsamples, lecture8_Rsamples
+#            CS544 Study Guide Module 5 Sampling and Errors
+```
+
+#### Stratified sampling
+
+```{r}
+# ordering using Location:
+set.seed(203)
+strat <- function(df, col.number, n, colname){
+    ord = order(df[[col.number]])
+    data = df[ord,]
+    table = table(data[[col.number]])
+    size =  round((n * table)/sum(table))
+    s = strata(data, size = size, method = "srswor", stratanames = c(colname))
+    s = getdata(data, s)
+    return(s)
+}
+
+Strat100 <- strat(df, 2, 100, 'Location')
+
+```
+
+#### Parametric Tests
+
+##### Minimum Salary 
+
+```{r}
+
+
+##### Sampling distribution:
+
+# note that min.bars and max.bars contain the sampling distribution of the 
+# sample means for min.salary and max.salary per city respectively
+
+salary <- aov(min.salary ~ Name, data = min.bars) 
+summary(salary)
+# Post Hoc:
+pairwise.t.test(min.bars$min.salary, min.bars$Name, p.adj = 'bonferroni')
+
+
+
+
+# Simple Random Sampling:
+
+salary <- aov(min.salary ~ Location, data = Simple100)
+summary(salary)
+# Post Hoc:
+pairwise.t.test(Simple100$min.salary, Simple100$Location, p.adj = 'bonferroni')
+
+# Testing with a smaller sample:
+
+salary.small <- aov(min.salary ~ Location, data = Simple28)
+summary(salary.small)
+# Post Hoc:
+pairwise.t.test(Simple28$min.salary, Simple28$Location, p.adj = 'bonferroni')
+
+
+
+# Consulted: R-Documentation. Compute Tukey Honest Significant Differences
+#            R - Documentation Fit an Analysis of Variance Model
+
+# Systematic Random Sampling:
+
+salary <- aov(min.salary ~ Location, data = Sys100)
+summary(salary)
+# Post Hoc:
+pairwise.t.test(Sys100$min.salary, Sys100$Location, p.adj = 'bonferroni')
+
+# Consulted: R-Documentation. Compute Tukey Honest Significant Differences
+#            R - Documentation Fit an Analysis of Variance Model
+
+# Systematic Random Sampling with inclusion probabilities:
+
+salary <- aov(min.salary ~ Location, data = Sysp100)
+summary(salary)
+# Post Hoc:
+pairwise.t.test(Sysp100$min.salary, Sysp100$Location, p.adj = 'bonferroni')
+
+# Consulted: R-Documentation. Compute Tukey Honest Significant Differences
+#            R - Documentation Fit an Analysis of Variance Model
+
+# Stratified random Sampling:
+
+salary <- aov(min.salary ~ Location, data = Strat100)
+summary(salary)
+# Post Hoc:
+pairwise.t.test(Strat100$min.salary, Strat100$Location, p.adj = 'bonferroni')
+
+# Consulted: R-Documentation. Compute Tukey Honest Significant Differences
+#            R - Documentation Fit an Analysis of Variance Model
+
+```
+
+##### Maximum Salary:
+
+```{r}
+
+##### Sampling distribution:
+
+salary <- aov(max.salary ~ Name, data = max.bars) 
+summary(salary)
+# Post Hoc:
+pairwise.t.test(max.bars$max.salary, min.bars$Name, p.adj = 'bonferroni')
+
+# Simple Random Sampling:
+
+salary <- aov(max.salary ~ Location, data = Simple100)
+summary(salary)
+# Post Hoc:
+pairwise.t.test(Simple100$max.salary, Simple100$Location, p.adj = 'bonferroni')
+
+# Testing with a smaller sample:
+
+salary.small <- aov(max.salary ~ Location, data = Simple28)
+summary(salary.small)
+# Post Hoc:
+pairwise.t.test(Simple28$max.salary, Simple28$Location, p.adj = 'bonferroni')
+
+# Consulted: R-Documentation. Compute Tukey Honest Significant Differences
+#            R - Documentation Fit an Analysis of Variance Model
+
+# Systematic Random Sampling:
+
+salary <- aov(max.salary ~ Location, data = Sys100)
+summary(salary)
+# Post Hoc:
+pairwise.t.test(Sys100$max.salary, Sys100$Location, p.adj = 'bonferroni')
+
+# Consulted: R-Documentation. Compute Tukey Honest Significant Differences
+#            R - Documentation Fit an Analysis of Variance Model
+
+
+# Systematic Random Sampling with inclusion probabilities:
+
+salary <- aov(max.salary ~ Location, data = Sysp100)
+summary(salary)
+# Post Hoc:
+pairwise.t.test(Sysp100$max.salary, Sysp100$Location, p.adj = 'bonferroni')
+
+# Consulted: R-Documentation. Compute Tukey Honest Significant Differences
+#            R - Documentation Fit an Analysis of Variance Model
+
+# Stratified random Sampling:
+
+salary <- aov(max.salary ~ Location, data = Strat100)
+summary(salary)
+# Post Hoc:
+pairwise.t.test(Strat100$max.salary, Strat100$Location, p.adj = 'bonferroni')
+
+# Consulted: R-Documentation. Compute Tukey Honest Significant Differences
+#            R - Documentation Fit an Analysis of Variance Model
+
+```
+
+#### Non-Parametric Tests
+
+```{r}
+#install.packages("pgirmess")
+library(pgirmess) 
+
+
+```
+
+##### Minimum Salary
+
+```{r}
+# Simple Random Sampling:
+
+kruskal.test(min.salary ~ Location, data = Simple100)
+#Post-Hoc
+kruskalmc(min.salary ~ Location, data = Simple100, probs = 0.05)
+
+# Testing with a smaller sample:
+
+kruskal.test(min.salary ~ Location, data = Simple28)
+# Post Hoc:
+kruskalmc(min.salary ~ Location, data = Simple28, probs = 0.05)
+
+
+# Consulted: R - Documentation Kruskal-Wallis Rank Sum Test
+#kruskalmc {pgirmess}	R Documentation, Multiple comparison test after Kruskal-Wallis
+
+# Systematic Random Sampling:
+kruskal.test(min.salary ~ Location, data = Sys100)
+#Post-Hoc
+kruskalmc(min.salary ~ Location, data = Sys100, probs = 0.05)
+
+# Consulted: R - Documentation Kruskal-Wallis Rank Sum Test
+#kruskalmc {pgirmess}	R Documentation, Multiple comparison test after Kruskal-Wallis
+
+# Systematic Random Sampling with inclusion probabilities:
+kruskal.test(min.salary ~ Location, data = Sysp100)
+#Post-Hoc
+kruskalmc(min.salary ~ Location, data = Sysp100, probs = 0.05)
+
+# Consulted: R - Documentation Kruskal-Wallis Rank Sum Test
+#kruskalmc {pgirmess}	R Documentation, Multiple comparison test after Kruskal-Wallis
+
+# Stratified random Sampling:
+kruskal.test(min.salary ~ Location, data = Strat100)
+#Post-Hoc
+kruskalmc(min.salary ~ Location, data = Strat100, probs = 0.05)
+
+# Consulted: R - Documentation Kruskal-Wallis Rank Sum Test
+#kruskalmc {pgirmess}	R Documentation, Multiple comparison test after Kruskal-Wallis
+
+```
+
+##### Maximum Salary
+
+```{r}
+# Simple Random Sampling:
+
+kruskal.test(max.salary ~ Location, data = Simple100)
+#Post-Hoc
+kruskalmc(max.salary ~ Location, data = Simple100, probs = 0.05)
+
+
+# Testing with a smaller sample:
+
+kruskal.test(max.salary ~ Location, data = Simple28)
+# Post Hoc:
+kruskalmc(max.salary ~ Location, data = Simple28, probs = 0.05)
+
+
+# Consulted: R - Documentation Kruskal-Wallis Rank Sum Test
+#kruskalmc {pgirmess}	R Documentation, Multiple comparison test after Kruskal-Wallis
+
+# Systematic Random Sampling:
+kruskal.test(max.salary ~ Location, data = Sys100)
+#Post-Hoc
+kruskalmc(max.salary ~ Location, data = Sys100, probs = 0.05)
+
+# Consulted: R - Documentation Kruskal-Wallis Rank Sum Test
+#kruskalmc {pgirmess}	R Documentation, Multiple comparison test after Kruskal-Wallis
+
+# Systematic Random Sampling with inclusion probabilities:
+kruskal.test(max.salary ~ Location, data = Sysp100)
+#Post-Hoc
+kruskalmc(max.salary ~ Location, data = Sysp100, probs = 0.05)
+
+# Consulted: R - Documentation Kruskal-Wallis Rank Sum Test
+#kruskalmc {pgirmess}	R Documentation, Multiple comparison test after Kruskal-Wallis
+
+# Stratified random Sampling:
+kruskal.test(max.salary ~ Location, data = Strat100)
+#Post-Hoc
+kruskalmc(max.salary ~ Location, data = Strat100, probs = 0.05)
+
+# Consulted: R - Documentation Kruskal-Wallis Rank Sum Test
+#kruskalmc {pgirmess}	R Documentation, Multiple comparison test after Kruskal-Wallis
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
